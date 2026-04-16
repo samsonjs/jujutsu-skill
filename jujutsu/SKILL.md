@@ -8,7 +8,7 @@ allowed-tools: Bash(jj *)
 
 This skill helps you work with Jujutsu, a Git-compatible VCS with mutable commits and automatic rebasing.
 
-**Tested with jj v0.37.0** - Commands may differ in other versions.
+**Tested with jj v0.40.0** - Commands may differ in other versions.
 
 ## Important: Automated/Agent Environment
 
@@ -19,6 +19,7 @@ When running as an agent:
 ```bash
 # Always use -m to avoid editor prompts
 jj desc -m "message"      # NOT: jj desc
+jj new -m "message"       # NOT: jj new && jj desc -m "..." (two steps when one works)
 jj squash -m "message"    # NOT: jj squash (which opens editor)
 ```
 
@@ -93,8 +94,8 @@ jj log -p
 # View specific commit
 jj show <change-id>
 
-# View diff of working copy
-jj diff
+# View diff of working copy in readable format
+jj diff --git --color never
 ```
 
 ### Moving Between Commits
@@ -103,8 +104,8 @@ jj diff
 # Create a new empty commit on top of current
 jj new
 
-# Create new commit with message
-jj new && jj desc -m "Commit message"
+# Create new commit with message (single command)
+jj new -m "Commit message"
 
 # Edit an existing commit (working copy becomes that commit)
 jj edit <change-id>
@@ -120,18 +121,40 @@ jj next -e
 
 ### Squashing Changes
 
-Move changes from current commit into its parent:
+Move changes from current commit into its parent, or between arbitrary commits:
 
 ```bash
 # Squash all changes into parent
 jj squash
+
+# Squash into a specific commit (not just parent)
+jj squash --into <change-id>
+
+# Move changes from one commit into another (neither needs to be @)
+jj squash --from <source-id> --into <dest-id>
+
+# Squash only specific paths
+jj squash path/to/file.txt
 ```
 
 **Note**: `jj squash -i` opens an interactive UI and will hang in agent environments. Avoid it.
 
 ### Splitting Commits
 
-**Warning**: `jj split` is interactive and will hang in agent environments. To divide a commit, use `jj restore` to move changes out, then create separate commits manually.
+`jj split` **without arguments** is interactive and will hang in agent environments. But `jj split <paths>` works non-interactively — it splits the listed paths into the first of two commits:
+
+```bash
+# Split current commit: listed paths stay in @-, remaining changes go to @
+jj split path/to/file.txt other/file.swift
+
+# Split a specific commit by change ID
+jj split -r <change-id> path/to/file.txt
+
+# --parallel makes the two resulting commits siblings rather than parent/child
+jj split --parallel path/to/file.txt
+```
+
+Avoid `jj split -i` (interactive diff editor).
 
 ### Absorbing Changes
 
@@ -160,6 +183,39 @@ jj undo
 
 This reverts the repository to its state before the previous command. Useful for recovering from mistakes like accidental `abandon`, `squash`, or `rebase`.
 
+**For deeper recovery, use the operation log.** `jj undo` only reverses the immediately prior op; after several operations it gets confusing. `jj op log` + `jj op restore` are far more powerful:
+
+```bash
+# See every operation jj has performed, with IDs
+jj op log
+
+# Jump back to the repo state at a specific operation (like a time machine)
+jj op restore <op-id>
+
+# Show what changed in one operation
+jj op show <op-id>
+```
+
+This is the real safety net — almost nothing in jj is actually lost, just unreachable from the current op.
+
+### Rebasing
+
+```bash
+# Rebase the current commit (and its descendants) onto a new parent
+jj rebase -d <dest>
+
+# Rebase a specific commit and its descendants
+jj rebase -s <source> -d <dest>
+
+# Rebase only one commit (no descendants move)
+jj rebase -r <change-id> -d <dest>
+
+# Rebase an entire branch (everything from source back to the common ancestor with dest)
+jj rebase -b <source> -d <dest>
+```
+
+`-d` can also take multiple destinations to create a merge commit.
+
 ### Restoring Files
 
 Discard changes to specific files or restore files from another revision:
@@ -180,8 +236,8 @@ jj restore --from <change-id> path/to/file.txt
 Bookmarks are jj's equivalent to git branches:
 
 ```bash
-# Create a bookmark at current commit
-jj bookmark create my-feature -r@
+# Create a bookmark at current commit (-r@ is the default, can be omitted)
+jj bookmark create my-feature
 
 # Move bookmark to a different commit
 jj bookmark move my-feature --to <change-id>
@@ -192,6 +248,8 @@ jj bookmark list
 # Delete a bookmark
 jj bookmark delete my-feature
 ```
+
+**Important**: Unlike git branches, bookmarks do NOT auto-advance when you create new commits. After making commits, `jj bookmark move my-feature --to @` is often needed before pushing.
 
 ## Git Integration
 
@@ -207,38 +265,36 @@ jj git init --colocate
 
 ### Switching Between jj and git (Colocated Repos)
 
-In a colocated repository (where both `.jj/` and `.git/` exist), you can use both jj and git commands. However, there are important considerations:
+In a colocated repository (`.jj/` and `.git/` both present), both tools can read the repo, but **prefer jj for all state-changing operations**. Mixing `git checkout`/`git commit`/`git reset` with jj's view of the working copy is a known source of confusion and lost work.
 
-**Switching to git mode** (e.g., for merge workflows):
+To move to a branch or commit, use jj:
+
 ```bash
-# First, ensure your jj working copy is clean
-jj st
+# Move the working copy to a bookmark (equivalent to `git checkout <branch>`)
+jj new <bookmark-name>
 
-# Then checkout a branch with git
-git checkout <branch-name>
+# Or edit the bookmark's commit directly
+jj edit <bookmark-name>
+
+# Pull remote changes and update bookmarks
+jj git fetch
 ```
 
-**Switching back to jj mode**:
-```bash
-# Use jj edit to resume working with jj
-jj edit <change-id>
-```
-
-**Important notes:**
-- Git may complain about uncommitted changes if jj's working copy differs from the git HEAD
-- ALWAYS ensure your work is committed in jj before switching to git
-- After git operations, jj will detect and incorporate the changes on next command
+Safe to use git for: read-only inspection (`git log`, `git diff`, `git show`), or operations jj doesn't cover (e.g. `git bisect`). After any raw git operation, run `jj st` so jj re-imports the state.
 
 ### Pushing Changes
 
 When the user asks you to push changes:
 
 ```bash
-# Push a specific bookmark to the remote
+# Push a specific existing bookmark to the remote
 jj git push -b <bookmark-name>
 
-# Example: push the main bookmark
-jj git push -b main
+# First push of a new bookmark requires --allow-new (recent jj versions)
+jj git push -b <bookmark-name> --allow-new
+
+# Shortcut: create a bookmark at @ and push it in one command
+jj git push -c @
 ```
 
 **Before pushing, ensure:**
@@ -246,7 +302,7 @@ jj git push -b main
 2. The commits are refined and atomic
 3. The user has explicitly requested the push
 
-**IMPORTANT**: Unlike git branches, jj bookmarks do not automatically move when you create new commits. You must manually update them before pushing:
+**IMPORTANT**: Unlike git branches, bookmarks do not automatically move when you create new commits. Update before pushing:
 
 ```bash
 # Move an existing bookmark to the current commit
@@ -256,15 +312,7 @@ jj bookmark move my-feature --to @
 jj git push -b my-feature
 ```
 
-If no bookmark exists for your changes, create one first:
-
-```bash
-# Create a bookmark at the current commit
-jj bookmark create my-feature
-
-# Then push it
-jj git push -b my-feature
-```
+**Refusing to push**: jj will refuse to push a bookmark whose commit has an empty description, contains conflicts, or is a merge introducing new changes. Run `jj show <bookmark>` first if a push is rejected.
 
 ## Handling Conflicts
 
@@ -273,9 +321,60 @@ jj allows committing conflicts — you can resolve them later:
 ```bash
 # View conflicts
 jj st
+
+# List the conflicted paths non-interactively
+jj resolve --list
 ```
 
-**Agent conflict resolution**: Do not use `jj resolve` (interactive). Instead, edit the conflicted files directly to remove conflict markers, then run `jj st` to verify resolution.
+**jj's conflict markers are NOT git's markers.** Editing them like git markers will produce a garbage resolution. jj uses a diff-style format that can represent 3-way and N-way conflicts:
+
+```
+<<<<<<< Conflict 1 of 1
+%%%%%%% Changes from base to side #1
+-context line
+-removed line
++added line by side 1
++++++++ Contents of side #2
+context line
+added line by side 2
+>>>>>>> Conflict 1 of 1 ends
+```
+
+To resolve: delete the entire `<<<<<<< ... >>>>>>>` block and replace it with the final merged content you want. The `%%%%%%%` section is a diff (base → side 1), the `+++++++` section is the literal content of side 2. Reconstruct the intended merged content from those hints.
+
+After editing:
+```bash
+jj st              # verify no more conflicts
+jj resolve --list  # should report nothing
+```
+
+Avoid `jj resolve` without args (launches an interactive merge tool). If you'd rather not hand-edit markers, configure a non-interactive tool and pass it: `jj resolve --tool <name> <path>`.
+
+## Immutable Commits
+
+Commits reachable from `trunk()` (typically `main`/`master` and anything merged into it) are **immutable** by default — `jj edit`, `abandon`, `squash`, and `rebase -r` on them will fail with an error like "Commit X is immutable."
+
+This is intentional safety, not a bug. The set is configured via `revset-aliases."immutable_heads()"` (usually `trunk()`). To genuinely rewrite public history (rare — usually the wrong answer), you'd override that config. When you see the error, the right reaction is almost always "make a new commit on top" rather than bypass.
+
+## Revsets (Brief)
+
+Most commands take `-r <revset>` rather than a single ID. A few useful ones:
+
+```bash
+# My commits not yet in trunk
+jj log -r 'mine() & ~::trunk()'
+
+# The stack leading up to @
+jj log -r '::@ & ~::trunk()'
+
+# All descendants of a commit
+jj log -r 'descendants(<id>)'
+
+# Commits touching a path
+jj log -r 'files("Sources/Screens/Camera/")'
+```
+
+Revsets compose: `&` (and), `|` (or), `~` (not), `::x` (ancestors incl. x), `x::` (descendants incl. x). Prefer revsets over looping in shell when operating on multiple commits.
 
 ## Preserving Commit Quality
 
@@ -291,19 +390,25 @@ jj st
 
 | Action | Command |
 |--------|---------|
-| Describe commit | `jj desc -m "message"` |
+| Describe current commit | `jj desc -m "message"` |
 | View status | `jj st` |
 | View log | `jj log` |
 | View diff | `jj diff` |
-| New commit | `jj st` then `jj new` only if `@` has changes, then `jj desc -m "message"` |
+| New commit with message | `jj new -m "message"` |
+| Split commit by paths | `jj split <paths>` |
 | Edit commit | `jj edit <id>` |
 | Squash to parent | `jj squash` |
-| Auto-distribute | `jj absorb` |
+| Squash to arbitrary commit | `jj squash --into <id>` |
+| Auto-distribute changes | `jj absorb` |
+| Rebase onto new parent | `jj rebase -d <dest>` |
 | Abandon commit | `jj abandon <id>` |
-| Undo last operation | `jj undo` |
+| Undo last op | `jj undo` |
+| Deeper recovery | `jj op log` + `jj op restore <op-id>` |
 | Restore files | `jj restore [paths]` |
 | Create bookmark | `jj bookmark create <name>` |
-| Push bookmark | `jj git push -b <name>` |
+| Move bookmark | `jj bookmark move <name> --to @` |
+| Push new bookmark | `jj git push -b <name> --allow-new` (or `jj git push -c @`) |
+| Push existing bookmark | `jj git push -b <name>` |
 
 ## Best Practices Summary
 
