@@ -8,9 +8,9 @@ This repository provides an Agent Skill for Claude Code and other compatible AI 
 
 ## Compatibility
 
-**Tested with:** jj v0.37.0
+**Tested with:** jj v0.40.0
 
-This skill is designed for jj v0.37.0 and may work with other versions, though compatibility is not guaranteed.
+This skill is designed for jj v0.40.0 and may work with other versions, though compatibility is not guaranteed.
 
 ## What is Jujutsu?
 
@@ -54,14 +54,14 @@ skill/
 
 The skill emphasizes:
 
-1. **Describe-first commits**: Use `jj desc -m "message"` before making changes
+1. **Describe-first commits**: Use `jj new -m "message"` before making changes
 2. **Atomic commits**: Each commit should represent one logical change
 3. **Commit quality preservation**: Leverage jj's mutability to refine commits
 4. **Clean history**: Use `squash`, `split`, and `absorb` to maintain a readable history
 
 ## Contributing
 
-Contributions are welcome. Please ensure any changes are compatible with jj v0.37.0.
+Contributions are welcome. Please ensure any changes are compatible with jj v0.40.0.
 
 ## License
 
