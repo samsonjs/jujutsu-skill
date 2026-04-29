@@ -288,6 +288,8 @@ Reverse the last jj operation:
 jj undo
 ```
 
+_**NOTE**: Don't try to run `jj op undo` that command does not exist._
+
 This reverts the repository to its state before the previous command. Useful for recovering from mistakes like accidental `abandon`, `squash`, or `rebase`.
 
 **For deeper recovery, use the operation log.** `jj undo` only reverses the immediately prior op; after several operations it gets confusing. `jj op log` + `jj op restore` are far more powerful:
