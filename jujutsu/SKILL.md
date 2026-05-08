@@ -43,52 +43,77 @@ In jj, your working directory is always a commit (referenced as `@`). Changes ar
 
 There is no need to run `jj commit`.
 
-### Commits Are Mutable
+### Changes Are Mutable
 
-**CRITICAL**: Unlike git, jj commits can be freely modified. This enables a high-quality commit workflow:
+Unlike git, jj changes can be freely modified — described, redescribed, split, squashed, rebased, abandoned. You don't have to get a change "right" up front; you can keep editing it as long as you like.
 
-1. Before starting work, run `jj st`. If `@` already has changes, run `jj new` first. If `@` is empty, use it as-is.
-2. Describe your intended changes with `jj desc -m"Message"`
-3. Make your changes.
-4. Do NOT run `jj new` when finished — leave that to the next task's step 1.
-
-You may refine the commit using `jj squash` or `jj absorb` as needed
+This is what makes the [scratchpad + squash](#the-inner-loop-scratchpad--squash) loop possible: instead of treating each commit as a one-shot event on a branch, you keep your real change as a parent and use an anonymous child as a workbench you fold in (or throw away) as you go.
 
 ### Change IDs vs Commit IDs
 
-- **Change ID**: A stable identifier (like `tqpwlqmp`) that persists when a commit is rewritten
-- **Commit ID**: A content hash (like `3ccf7581`) that changes when commit content changes
+- **Change ID** (like `tqpwlqmp`): a stable identifier for the *idea* of the change. Survives rewrites — squash, rebase, redescribe all preserve it.
+- **Commit ID** (like `3ccf7581`): a content hash for one specific snapshot. Changes whenever the change's content does.
 
-Prefer using Change IDs when referencing commits in commands.
+Almost always reference things by **change ID** in commands. Commit IDs are useful mainly when you need to point at a specific historical snapshot (see `jj evolog`).
 
-## Essential Workflow
+## The Inner Loop: Scratchpad + Squash
 
-### Starting Work: Describe First, Then Code
+The idiomatic jj loop is layered. Two changes are in play:
 
-**Always create your commit message before writing code:**
+- **Parent**: the change you'll eventually push. Has a description.
+- **`@` (scratchpad)**: an anonymous child on top. No description. Treated like git's index — a place to iterate, run tests, undo, redo. Folded into the parent or abandoned.
 
 ```bash
-# First, describe what you intend to do
-jj desc -m "Add user authentication to login endpoint"
-
-# Then make your changes - they automatically become part of this commit
-# ... edit files ...
-
-# Check status
-jj st
+jj new -m "Add user authentication"   # parent — what you're shipping
+jj new                                # scratchpad — no message
+# edit, test, repeat
+jj diff                               # review the scratchpad
+jj squash                             # fold into parent; fresh empty @ on top
+# OR
+jj abandon                            # throw the scratchpad away; back on parent
 ```
 
-### Creating Atomic Commits
+After `jj squash` you're back on a fresh empty `@`, ready for the next iteration. Run as many scratchpad → squash cycles as you want; each one means "I made progress, keep it." If a scratchpad is heading nowhere, `jj abandon` returns you to the parent untouched.
 
-Each commit should represent ONE logical change. Use this format for commit messages:
+The parent's commit ID changes on every squash, but its **change ID is stable** — that's why you reference it by change ID.
 
+### Parallel Experiments
+
+Want to try a different approach without losing the current scratchpad? Start a sibling on the same parent:
+
+```bash
+jj new --insert-after <parent-id>     # new scratchpad, sibling to the current @
 ```
-Examples:
-- "Add validation to user input forms"
-- "Fix null pointer in payment processor"
-- "Remove deprecated API endpoints"
-- "Update dependencies to latest versions"
+
+Now there are two children of the parent. Iterate in either, abandon the loser, squash the winner. Switch between them with `jj edit <change-id>`.
+
+### When the Scratchpad Is Overkill
+
+Tiny one-shot work (typo fix, single-line tweak): describe `@` directly and edit. Skip the scratchpad layer.
+
+```bash
+jj new -m "Fix typo in error message"
+# edit
 ```
+
+The scratchpad's value is being able to throw away dead-ends without polluting the parent's history. If there's no risk of dead-ends, the layer is overhead.
+
+### Stacking
+
+For multiple related changes, repeat the loop on top of the previous parent:
+
+```bash
+jj new -m "Add user authentication"   # change A
+jj new                                # scratchpad on A
+# work, squash...
+jj new -m "Add session management"    # change B, on top of A
+jj new                                # scratchpad on B
+# work, squash...
+```
+
+You end up with a stack: `A ← B ← @`. Push as separate PRs (e.g. via `gh-stack`) or roll them up.
+
+## Inspecting and Navigating
 
 ### Viewing History
 
@@ -102,7 +127,7 @@ jj log -n 20 --no-graph
 # View with patches
 jj log -p
 
-# View specific commit
+# Show a specific change
 jj show <change-id>
 
 # Summary-only variants (useful for quickly surveying a change)
@@ -125,35 +150,36 @@ jj file show -r <rev> path/to/file   # print file contents at a revision
 jj file annotate path/to/file        # blame equivalent
 ```
 
-### Moving Between Commits
+### Moving Between Changes
+
+In the scratchpad workflow, the primary "move" is `jj new` — start a fresh empty change on top, or as a sibling. `jj edit` is for jumping back to a specific change, which you'll usually want to *modify* via a new scratchpad on top + squash, not by editing in place.
 
 ```bash
-# Create a new empty commit on top of current
+# Start an anonymous scratchpad on top of @
 jj new
 
-# Create new commit with message (single command)
-jj new -m "Commit message"
+# Same, with a description (this is a "real" change, not a scratchpad)
+jj new -m "Description"
 
-# Edit an existing commit (working copy becomes that commit)
-jj edit <change-id>
-
-# Edit the previous commit
-jj prev -e
-
-# Edit the next commit
-jj next -e
-
-# Insert a new commit into the middle of a stack (stacked-PR workflows)
+# Insert a new change into the middle of a stack
 jj new --insert-after <change-id> -m "..."
 jj new --insert-before <change-id> -m "..."
 
+# Sibling scratchpad — for parallel experiments off the same parent
+jj new --insert-after <parent-id>
+
 # Create a merge commit with multiple parents
 jj new <rev1> <rev2> -m "Merge branches"
+
+# Jump @ to an existing change (use sparingly — prefer new+squash for edits)
+jj edit <change-id>
+jj prev -e        # @ becomes the previous change
+jj next -e        # @ becomes the next change
 ```
 
-## Refining Commits
+## Refining Changes
 
-### Squashing Changes
+### Squashing
 
 Move changes from current commit into its parent, or between arbitrary commits:
 
@@ -178,7 +204,7 @@ jj squash --keep-emptied
 
 If both source and destination have non-empty descriptions, `jj squash` prompts for the combined description in an editor. Pass `-m "..."` or `--use-destination-message` to avoid the prompt.
 
-### Splitting Commits
+### Splitting
 
 `jj split` **without arguments** is interactive and will hang in agent environments. But `jj split <paths>` works non-interactively — it splits the listed paths into the first of two commits:
 
@@ -195,7 +221,7 @@ jj split --parallel path/to/file.txt
 
 Avoid `jj split -i` (interactive diff editor).
 
-### Absorbing Changes
+### Absorbing
 
 Automatically distribute changes to the commits that last modified those lines:
 
@@ -204,9 +230,9 @@ Automatically distribute changes to the commits that last modified those lines:
 jj absorb
 ```
 
-### Abandoning Commits
+### Abandoning
 
-Remove a commit entirely (descendants are rebased to its parent):
+Remove a change entirely (descendants are rebased to its parent):
 
 ```bash
 jj abandon <change-id>
@@ -346,48 +372,23 @@ jj restore --from <change-id> path/to/file.txt
 
 ## Working with Bookmarks (Branches)
 
-Bookmarks are jj's equivalent to git branches:
+You usually don't need bookmarks. `jj git push -c @` and `jj git push --named name=@` create-and-push in one step (see [Pushing Changes](#pushing-changes)). Reach for the commands below only when a named local ref earns its keep — updating an already-pushed branch, sharing a ref name across multiple commands, or stacked-PR work.
 
 ```bash
-# Create a bookmark (fails if the name already exists)
-jj bookmark create my-feature                  # -r defaults to @
-
-# Create-or-update: the primitive agents usually want
-jj bookmark set my-feature -r @                # create if missing, move if exists
-jj bookmark set my-feature -r @ -B             # -B/--allow-backwards: required when moving backwards/sideways
-
-# Move an existing bookmark (fails if the name doesn't exist)
-jj bookmark move my-feature --to <change-id>
-
-# Advance: automatically move the nearest bookmark(s) forward to @
-jj bookmark advance -t @
-
-# Rename
-jj bookmark rename old-name new-name
-
-# List
+jj bookmark set my-feature -r @            # create or move; -B to allow moving backwards/sideways
 jj bookmark list
-
-# Start tracking a remote bookmark as a local one
-jj bookmark track my-feature@origin
+jj bookmark rename old new
+jj bookmark track my-feature@origin        # start tracking a remote bookmark
 ```
 
-**Important**: Unlike git branches, bookmarks do NOT auto-advance when you create new commits. After making commits, `jj bookmark set my-feature -r @` (or `jj bookmark advance -t @`) is often needed before pushing.
-
-### Delete vs Forget (Important Distinction)
-
-These look similar but behave very differently:
+### Delete vs Forget
 
 ```bash
-# Delete: propagates the deletion to the remote on next push
-jj bookmark delete my-feature
-
-# Forget: drops the local bookmark only, does NOT push a deletion
-# Any corresponding remote bookmark becomes untracked
-jj bookmark forget my-feature
+jj bookmark delete my-feature              # propagates the deletion to the remote on next push
+jj bookmark forget my-feature              # drops local only; remote bookmark becomes untracked
 ```
 
-When undoing a mistaken local bookmark, use `forget` unless you actually want the remote branch deleted.
+Use `forget` when undoing a local mistake. Use `delete` only when you actually want the remote branch gone.
 
 ## Git Integration
 
@@ -403,42 +404,48 @@ jj git init --colocate
 
 ### Switching Between jj and git (Colocated Repos)
 
-In a colocated repository (`.jj/` and `.git/` both present), both tools can read the repo, but **prefer jj for all state-changing operations**. Mixing `git checkout`/`git commit`/`git reset` with jj's view of the working copy is a known source of confusion and lost work.
-
-To move to a branch or commit, use jj:
+In a colocated repository (`.jj/` and `.git/` both present), both tools can read the repo, but **prefer jj for all state-changing operations**. Mixing `git checkout` / `git commit` / `git reset` with jj's view of the working copy is a known source of confusion and lost work.
 
 ```bash
-# Move the working copy to a bookmark (equivalent to `git checkout <branch>`)
-jj new <bookmark-name>
-
-# Or edit the bookmark's commit directly
-jj edit <bookmark-name>
-
-# Pull remote changes and update bookmarks
-jj git fetch
+jj new <bookmark-or-rev>     # start a fresh change on top of a ref (≈ git checkout + commit)
+jj edit <bookmark-or-rev>    # jump @ onto that change directly
+jj git fetch                 # pull remote changes and update tracked bookmarks
 ```
 
 Safe to use git for: read-only inspection (`git log`, `git diff`, `git show`), or operations jj doesn't cover (e.g. `git bisect`). After any raw git operation, run `jj st` so jj re-imports the state.
 
 ### Pushing Changes
 
-When the user asks you to push changes:
+**Default to one-shot push commands. Don't create bookmarks manually unless you have a reason to.**
+
+The two commands that should cover ~90% of pushes:
 
 ```bash
-# Push an existing bookmark. If the bookmark is new locally, jj will create it
-# on the remote and auto-track it — no --allow-new flag needed in jj 0.40.
-jj git push -b <bookmark-name>
-
-# Create a NEW bookmark at a specific revision and push it, in one command.
-# Preferred when you know the branch name you want on the remote.
-jj git push --named feature/x=@
-jj git push --named feature/x=<change-id>
-
-# Same idea but jj picks the name (defaults to push-<change-id>)
+# Push @ with an auto-generated name (push-<change-id>). Use this when you don't
+# care about the remote branch name — most feature/PR work fits here.
 jj git push -c @
 
-# Preview without actually pushing
-jj git push --dry-run -b <bookmark-name>
+# Push @ under a name you choose. Use when the branch name matters
+# (convention, ticket prefix, user asked for a specific name).
+jj git push --named feature/auth-fix=@
+jj git push --named bug/1234=<change-id>
+```
+
+Both create the bookmark, push it, and set up tracking in a single command. No prior `jj bookmark create` or `jj bookmark set` needed. No `--allow-new` flag needed in jj 0.40.
+
+**Only fall back to `jj git push -b <name>` when the bookmark already exists** — typically because you pushed earlier and now want to update the same branch with new commits. Even then, remember bookmarks don't auto-advance:
+
+```bash
+# Updating a previously-pushed branch with new work on @
+jj bookmark set my-feature -r @ -B   # -B because you're moving it forward
+jj git push -b my-feature
+```
+
+Other useful flags:
+
+```bash
+# Preview without pushing
+jj git push --dry-run -c @
 
 # Push every tracked bookmark whose @-position has moved
 jj git push --tracked
@@ -447,24 +454,14 @@ jj git push --tracked
 **Safety checks** jj runs automatically (these mirror `git push --force-with-lease`):
 
 - The remote is only updated if it matches what jj last fetched. Run `jj git fetch` if a push is rejected for remote-moved-forward.
-- Pushes are refused when the bookmark's commit has an empty description, contains conflicts, is private (`git.private-commits`), or is a new merge commit introducing unpushed work.
-  - `jj show <bookmark>` will usually tell you which.
+- Pushes are refused when the commit has an empty description, contains conflicts, is private (`git.private-commits`), or is a new merge commit introducing unpushed work.
+  - `jj show <rev>` will usually tell you which.
   - Override with `--allow-empty-description` or `--allow-private` only when you actually mean it.
 
 **Before pushing, ensure:**
-1. Your bookmark points to the correct commit (bookmarks don't auto-advance like git branches)
+1. The commit at `@` (or whatever you're pushing) is the right one
 2. The commits are refined and atomic
 3. The user has explicitly requested the push
-
-**IMPORTANT**: Unlike git branches, bookmarks do not automatically move when you create new commits. Update before pushing:
-
-```bash
-# Update bookmark to @ (create-or-move)
-jj bookmark set my-feature -r @
-
-# Then push it
-jj git push -b my-feature
-```
 
 ## Handling Conflicts
 
@@ -534,62 +531,88 @@ jj log -r 'files("Sources/Screens/Camera/")'
 
 Revsets compose: `&` (and), `|` (or), `~` (not), `::x` (ancestors incl. x), `x::` (descendants incl. x). Prefer revsets over looping in shell when operating on multiple commits.
 
-## Preserving Commit Quality
+## Refining a Change Before Pushing
 
-**IMPORTANT**: Because commits are mutable, always refine them:
+Mutability is the point — refine freely. Before a change leaves your machine:
 
-1. **Review your commit**: `jj show @` or `jj diff`
-2. **Is it atomic?** One logical change per commit
-3. **Is the message clear?** Use imperative verb phrase in sentence case format with no full stop: "Verb object"
-4. **Are there unrelated changes?** Use `jj restore` to move changes out, then create separate commits
-5. **Should changes be elsewhere?** Use `jj squash` or `jj absorb`
+1. **Review** with `jj show <change-id>` or `jj diff -r <change-id>`
+2. **Atomic?** If it spans two ideas, `jj split <paths>` or move pieces with `jj squash --from / --into`
+3. **Message clear?** Use an imperative verb phrase in sentence case, no full stop: "Verb object". Update with `jj desc -m "..."` (or `jj metaedit -m "..."` if you want to change just the description without altering the snapshot)
+4. **Unrelated changes leaked in?** `jj restore <paths>` to drop them
+5. **Belongs in an ancestor?** `jj squash --into <id>` or `jj absorb`
 
 ## Quick Reference
 
+### Inner loop
+
 | Action | Command |
 |--------|---------|
-| Describe current commit | `jj desc -m "message"` |
-| Describe from stdin (multi-line) | `... \| jj desc --stdin` |
-| View status | `jj st` |
-| View log (trim for agents) | `jj log -n 20 --no-graph` |
-| View diff | `jj diff` |
-| Diff paths only / stats | `jj diff --name-only` / `jj diff --stat` |
-| Inspect file at a revision | `jj file show -r <id> <path>` |
+| Status / diff of scratchpad | `jj st` / `jj diff` |
+| Start parent change (with description) | `jj new -m "message"` |
+| Start anonymous scratchpad on top | `jj new` |
+| Sibling scratchpad off same parent | `jj new --insert-after <parent-id>` |
+| Fold scratchpad into parent | `jj squash` |
+| Throw scratchpad away | `jj abandon` |
+| Drop uncommitted edits in scratchpad | `jj restore [paths]` |
+| Update parent's description | `jj desc -m "..."` (on @-) or `jj metaedit -m "..." -r <id>` |
+
+### Pushing
+
+| Action | Command |
+|--------|---------|
+| Push @ with auto-generated name (default) | `jj git push -c @` |
+| Push @ with a chosen name | `jj git push --named feature/x=@` |
+| Update an existing pushed bookmark | `jj bookmark set <name> -r @ -B && jj git push -b <name>` |
+| Preview a push | `jj git push --dry-run -c @` |
+
+### Inspect / navigate
+
+| Action | Command |
+|--------|---------|
+| Log (trim for agents) | `jj log -n 20 --no-graph` |
+| Show a change | `jj show <change-id>` |
+| Diff paths / stats | `jj diff --name-only` / `jj diff --stat` |
+| File contents at a revision | `jj file show -r <id> <path>` |
 | Blame | `jj file annotate <path>` |
-| New commit with message | `jj new -m "message"` |
-| Insert into middle of stack | `jj new --insert-after <id> -m "..."` |
-| Split commit by paths | `jj split <paths>` |
-| Edit commit | `jj edit <id>` |
-| Squash to parent | `jj squash` |
-| Squash to arbitrary commit | `jj squash --into <id>` |
-| Auto-distribute changes | `jj absorb` |
+| Jump @ to a change | `jj edit <change-id>` |
+
+### Refine / rearrange
+
+| Action | Command |
+|--------|---------|
+| Squash into a non-parent | `jj squash --into <id>` |
+| Move bits between changes | `jj squash --from <src> --into <dst>` |
+| Split by paths | `jj split <paths>` |
+| Auto-distribute to ancestors | `jj absorb` |
 | Rebase onto new parent | `jj rebase -d <dest>` |
-| Abandon commit | `jj abandon <id>` |
-| Revert (inverse commit) | `jj revert -r <id> --insert-after @` |
-| Cherry-pick equivalent | `jj duplicate <id> --onto <dest>` |
-| Edit author/timestamp/desc | `jj metaedit --update-author` etc. |
+| Abandon a change | `jj abandon <id>` |
+| Inverse-commit (revert) | `jj revert -r <id> --insert-after @` |
+| Copy a change elsewhere | `jj duplicate <id> --onto <dest>` |
+| Edit author/timestamp/desc | `jj metaedit ...` |
+
+### Recover
+
+| Action | Command |
+|--------|---------|
 | See prior versions of a change | `jj evolog -p` |
 | Compare two versions of a change | `jj interdiff --from <a> --to <b>` |
 | Undo last op | `jj undo` |
 | Deeper recovery | `jj op log` + `jj op restore <op-id>` |
 | Revert a single op mid-history | `jj op revert <op-id>` |
-| Restore files | `jj restore [paths]` |
-| Create bookmark | `jj bookmark create <name>` |
-| Create-or-update bookmark | `jj bookmark set <name> -r @` |
-| Advance nearest bookmark to @ | `jj bookmark advance -t @` |
-| Rename bookmark | `jj bookmark rename old new` |
-| Forget bookmark (local only) | `jj bookmark forget <name>` |
-| Delete bookmark (propagates on push) | `jj bookmark delete <name>` |
-| Push existing bookmark | `jj git push -b <name>` |
-| Push NEW bookmark with chosen name | `jj git push --named feature/x=@` |
-| Push @ with auto-generated name | `jj git push -c @` |
-| Preview a push | `jj git push --dry-run -b <name>` |
 | Bypass immutability (rare) | `jj --ignore-immutable <cmd>` |
+
+### Bookmarks (rare)
+
+| Action | Command |
+|--------|---------|
+| Create-or-move bookmark | `jj bookmark set <name> -r @` (`-B` to move backwards) |
+| Forget local bookmark | `jj bookmark forget <name>` |
+| Delete (propagates on push) | `jj bookmark delete <name>` |
 
 ## Best Practices Summary
 
-1. **Describe first**: Set the commit message before coding
-2. **One change per commit**: Keep commits atomic and focused
-3. **Use change IDs**: They're stable across rewrites
-4. **Refine commits**: Leverage mutability for clean history
-5. **Embrace the workflow**: No staging area, no stashing - just commits
+1. **Layer your work**: parent change with a description, anonymous scratchpad on top. Squash when good, abandon when not.
+2. **Reference by change ID**: stable across rewrites. Commit IDs are for specific snapshots.
+3. **Refine before pushing, not before coding**: mutability means you don't have to plan the perfect change up front. Iterate, then clean up.
+4. **Push with `-c @` or `--named`**: don't bother creating bookmarks manually for normal PR work.
+5. **Trust the op log**: `jj op log` + `jj op restore` is your safety net. Almost nothing is truly lost.
