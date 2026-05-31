@@ -401,17 +401,22 @@ jj git push -b my-feature          # sends the deletion to the remote
 
 ### Tugging Bookmarks Forward
 
-Bookmarks don't auto-advance when you squash or rebase. After iterating on a change, the bookmark may be pointing at an older version and needs to be dragged up:
+Bookmarks don't auto-advance when you squash or rebase. After iterating on a change, the bookmark may be pointing at an older version and needs to be dragged up.
+
+**When you know the bookmark name** — just set it directly:
 
 ```bash
-# Move a specific bookmark to the current change
-jj bookmark set my-feature -r @ -B   # -B allows moving forward/sideways
+jj bookmark set my-feature -r @-   # or whatever revision it should point at
+jj bookmark set main -r @-         # -B only needed when moving backwards/sideways
+```
 
-# Find the nearest bookmark below @ and move it up (a useful pattern)
+**When you don't know which bookmark is lagging** — use the revset to find the nearest one:
+
+```bash
 jj bookmark move --from "heads(::@ & bookmarks())" --to @
 ```
 
-The revset `heads(::@ & bookmarks())` finds the closest bookmark ancestor of `@` — handy when you've squashed several times and the bookmark has lagged behind. Worth defining as a config alias if you do this often.
+The revset `heads(::@ & bookmarks())` finds the closest bookmark ancestor of `@`. Worth defining as a config alias if you do this often, but reach for named `bookmark set` first when you already know what you're moving.
 
 ## Git Integration
 
@@ -629,7 +634,8 @@ Mutability is the point — refine freely. Before a change leaves your machine:
 | Action | Command |
 |--------|---------|
 | Create-or-move bookmark | `jj bookmark set <name> -r @` (`-B` to move backwards/sideways) |
-| Drag bookmark up to @ (tug) | `jj bookmark move --from "heads(::@ & bookmarks())" --to @` |
+| Move a known bookmark to a rev | `jj bookmark set <name> -r <rev>` |
+| Tug nearest bookmark up to @ | `jj bookmark move --from "heads(::@ & bookmarks())" --to @` |
 | Forget local bookmark | `jj bookmark forget <name>` |
 | Delete locally + push deletion | `jj bookmark delete <name> && jj git push -b <name>` |
 | Push all pending deletions | `jj git push --deleted` (no argument — pushes ALL deleted bookmarks) |
