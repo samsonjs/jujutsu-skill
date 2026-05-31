@@ -82,10 +82,10 @@ The parent's commit ID changes on every squash, but its **change ID is stable** 
 Want to try a different approach without losing the current scratchpad? Start a sibling on the same parent:
 
 ```bash
-jj new --insert-after <parent-id>     # new scratchpad, sibling to the current @
+jj new <parent-id>                    # new scratchpad, sibling to the current @
 ```
 
-Now there are two children of the parent. Iterate in either, abandon the loser, squash the winner. Switch between them with `jj edit <change-id>`.
+Now there are two children of the parent. Iterate in either, abandon the loser, squash the winner. Switch between them with `jj edit <change-id>`. Note: `--insert-after <parent-id>` is different — it inserts the new commit *between* parent-id and its existing children (rebasing those children on top).
 
 ### When the Scratchpad Is Overkill
 
@@ -131,9 +131,9 @@ jj log -p
 jj show <change-id>
 
 # Summary-only variants (useful for quickly surveying a change)
-jj show --summary <change-id>        # path + add/mod/del per file
-jj show --stat <change-id>           # histogram of changes
-jj diff --name-only                  # just the paths
+jj show --name-only <change-id>      # just the paths changed
+jj show --stat <change-id>           # histogram of changes per file
+jj diff --name-only                  # just the paths (working copy)
 jj diff --from <a> --to <b>          # compare two arbitrary revs
 
 # View diff of working copy in readable format
@@ -166,7 +166,7 @@ jj new --insert-after <change-id> -m "..."
 jj new --insert-before <change-id> -m "..."
 
 # Sibling scratchpad — for parallel experiments off the same parent
-jj new --insert-after <parent-id>
+jj new <parent-id>
 
 # Create a merge commit with multiple parents
 jj new <rev1> <rev2> -m "Merge branches"
@@ -286,7 +286,7 @@ jj fix                    # fix @ and its changed files
 jj fix -s <change-id>     # fix a specific commit and its descendants
 ```
 
-Requires `fix.tools.*` config. See `jj help -k config`.
+Requires `fix.tools.*` configured in `~/.config/jj/config.toml` first — without it, `jj fix` is a no-op. See `jj help -k config` for the format.
 
 ### Seeing How a Change Evolved
 
@@ -384,11 +384,34 @@ jj bookmark track my-feature@origin        # start tracking a remote bookmark
 ### Delete vs Forget
 
 ```bash
-jj bookmark delete my-feature              # propagates the deletion to the remote on next push
+jj bookmark delete my-feature              # marks for deletion; propagates to remote on next push
 jj bookmark forget my-feature              # drops local only; remote bookmark becomes untracked
 ```
 
 Use `forget` when undoing a local mistake. Use `delete` only when you actually want the remote branch gone.
+
+**Pushing a deleted bookmark**: `jj bookmark delete` only marks it locally. To propagate the deletion to the remote, push by name — jj sends a delete to the remote:
+
+```bash
+jj bookmark delete my-feature
+jj git push -b my-feature          # sends the deletion to the remote
+```
+
+`jj git push --deleted` (no argument) pushes ALL pending bookmark deletions at once. There is **no `--deleted <name>` form** — `--deleted` is a boolean flag, not a parameter that takes a name.
+
+### Tugging Bookmarks Forward
+
+Bookmarks don't auto-advance when you squash or rebase. After iterating on a change, the bookmark may be pointing at an older version and needs to be dragged up:
+
+```bash
+# Move a specific bookmark to the current change
+jj bookmark set my-feature -r @ -B   # -B allows moving forward/sideways
+
+# Find the nearest bookmark below @ and move it up (a useful pattern)
+jj bookmark move --from "heads(::@ & bookmarks())" --to @
+```
+
+The revset `heads(::@ & bookmarks())` finds the closest bookmark ancestor of `@` — handy when you've squashed several times and the bookmark has lagged behind. Worth defining as a config alias if you do this often.
 
 ## Git Integration
 
@@ -550,7 +573,7 @@ Mutability is the point — refine freely. Before a change leaves your machine:
 | Status / diff of scratchpad | `jj st` / `jj diff` |
 | Start parent change (with description) | `jj new -m "message"` |
 | Start anonymous scratchpad on top | `jj new` |
-| Sibling scratchpad off same parent | `jj new --insert-after <parent-id>` |
+| Sibling scratchpad off same parent | `jj new <parent-id>` |
 | Fold scratchpad into parent | `jj squash` |
 | Throw scratchpad away | `jj abandon` |
 | Drop uncommitted edits in scratchpad | `jj restore [paths]` |
@@ -605,9 +628,11 @@ Mutability is the point — refine freely. Before a change leaves your machine:
 
 | Action | Command |
 |--------|---------|
-| Create-or-move bookmark | `jj bookmark set <name> -r @` (`-B` to move backwards) |
+| Create-or-move bookmark | `jj bookmark set <name> -r @` (`-B` to move backwards/sideways) |
+| Drag bookmark up to @ (tug) | `jj bookmark move --from "heads(::@ & bookmarks())" --to @` |
 | Forget local bookmark | `jj bookmark forget <name>` |
-| Delete (propagates on push) | `jj bookmark delete <name>` |
+| Delete locally + push deletion | `jj bookmark delete <name> && jj git push -b <name>` |
+| Push all pending deletions | `jj git push --deleted` (no argument — pushes ALL deleted bookmarks) |
 
 ## Best Practices Summary
 
