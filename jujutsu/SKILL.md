@@ -202,7 +202,10 @@ jj squash --keep-emptied
 
 **Note**: `jj squash -i` opens an interactive UI and will hang in agent environments. Avoid it.
 
-If both source and destination have non-empty descriptions, `jj squash` prompts for the combined description in an editor. Pass `-m "..."` or `--use-destination-message` to avoid the prompt.
+If both source and destination have non-empty descriptions, `jj squash` prompts for the combined description in an editor. To avoid the prompt:
+
+- **Prefer `-m "..."`** — always safe, you supply the final message explicitly.
+- **`--use-destination-message`** keeps the destination's description and discards the source's. Only use this when you are certain the destination has the real description. In the normal scratchpad workflow (`jj squash` with no args) the destination is the parent `@-`, which is correct. But if the destination is an anonymous change with an empty description — e.g. because source/destination are accidentally reversed — `--use-destination-message` will silently discard the real message. When in doubt, use `-m`.
 
 ### Splitting
 
