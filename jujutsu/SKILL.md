@@ -10,6 +10,18 @@ This skill helps you work with Jujutsu, a Git-compatible VCS with mutable commit
 
 **Tested with jj v0.40.0** - Commands may differ in other versions.
 
+## Think in jj, Not in Git
+
+jj is Git-compatible, but the user works in jj and thinks in jj — so should you. The failure mode is narrating and reasoning in git terms ("amend the commit", "the branch", "is HEAD pushed?"). The rest of this skill explains jj by analogy to git to get you oriented; once oriented, drop the analogy and reason in jj's own model. Don't translate jj back into git in your thinking or your replies.
+
+- **The working copy is a change, always.** There is no staging, no "committing", no "amending". Editing files just updates the change at `@`. This is not an event — never narrate it ("jj auto-amended the commit", "the edit got folded into the commit"). The user is not thinking about commits 99% of the time; neither should you.
+- **Refer to work by what it is, not by SHAs.** Say "the VNC change" or "the change at `@`", not "commit 3c52cf9b" or "HEAD". Reach for commit IDs only when pointing at a specific historical snapshot.
+- **Bookmarks are incidental labels for pushing, not branches you live on.** You don't "switch branches" or "work on `main`". You work on a change; a bookmark may happen to point at it when it's time to push.
+- **An empty `@` on top is normal.** After `jj squash` or `jj git push`, jj leaves a fresh empty `@`. That is the expected resting state, not a problem to fix or a surprise to explain.
+- **Reason about state in jj terms.** Ask what a change *is* and whether it's described/pushed — not whether `HEAD` matches a ref or a branch is "ahead/behind".
+
+**Vocabulary:** "change" not "commit"; "describe a change" not "make a commit"; "the change at `@`" not "HEAD"; "point a bookmark at" not "create a branch". Only use git vocabulary when the user does, or when explaining the git-interop layer itself.
+
 ## Important: Automated/Agent Environment
 
 When running as an agent:
