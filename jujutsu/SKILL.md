@@ -49,9 +49,9 @@ printf '%s\n' "Subject line" "" "Body paragraph with \"quotes\" and \$vars." | j
 
 ## Core Concepts
 
-### The Working Copy is a Commit
+### The Working Copy is a Change
 
-In jj, your working directory is always a commit (referenced as `@`). Changes are automatically snapshotted when you run any jj command. There is no staging area.
+In jj, your working copy is always a change (referenced as `@`). Edits are automatically snapshotted into it whenever you run any jj command. There is no staging area.
 
 There is no need to run `jj commit`.
 
@@ -193,7 +193,7 @@ jj next -e        # @ becomes the next change
 
 ### Squashing
 
-Move changes from current commit into its parent, or between arbitrary commits:
+Move part of the current change into its parent, or between arbitrary changes:
 
 ```bash
 # Squash all changes into parent
@@ -221,7 +221,7 @@ If both source and destination have non-empty descriptions, `jj squash` prompts 
 
 ### Splitting
 
-`jj split` **without arguments** is interactive and will hang in agent environments. But `jj split <paths>` works non-interactively — it splits the listed paths into the first of two commits:
+`jj split` **without arguments** is interactive and will hang in agent environments. But `jj split <paths>` works non-interactively — it splits the listed paths into the first of two changes:
 
 ```bash
 # Split current commit: listed paths stay in @-, remaining changes go to @
@@ -238,7 +238,7 @@ Avoid `jj split -i` (interactive diff editor).
 
 ### Absorbing
 
-Automatically distribute changes to the commits that last modified those lines:
+Automatically fold each hunk into the ancestor change that last modified those lines:
 
 ```bash
 # Absorb working copy changes into appropriate ancestor commits
@@ -294,7 +294,7 @@ jj metaedit --update-author-timestamp      # bump author date to now
 
 ### Applying Formatters
 
-`jj fix` runs configured code formatters over changed files and updates the containing commits (and descendants):
+`jj fix` runs configured code formatters over changed files and updates the changes containing them (and descendants):
 
 ```bash
 jj fix                    # fix @ and its changed files
