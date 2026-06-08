@@ -46,8 +46,16 @@ cp -r skill/ ~/.claude/skills/jj-vcs/
 ## Skill Contents
 
 ```
-skill/
-└── SKILL.md    # Main skill file with jj workflow instructions
+jujutsu/
+├── SKILL.md          # Core loop: safety, jj mindset, scratchpad+squash, pushing (always loaded)
+└── reference/        # One file per task, read on demand to keep activation cheap
+    ├── inspect.md    # History, files-at-rev, blame, moving between changes, stacking
+    ├── refine.md     # Split, absorb, abandon, revert, duplicate, metaedit, rebase, immutable
+    ├── recover.md    # evolog, undo, op log/restore/revert
+    ├── bookmarks.md  # Set/delete/forget/track, tugging forward
+    ├── git.md        # Clone/init, colocated repos, push safety
+    ├── conflicts.md  # jj's conflict markers and resolution
+    └── revsets.md    # Revset syntax
 ```
 
 ## Key Workflow Philosophy
