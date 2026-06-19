@@ -102,7 +102,7 @@ jj git push --named feature/auth-fix=@
 jj git push --named bug/1234=<change-id>
 ```
 
-Both create the bookmark, push it, and set up tracking in one command. No prior `jj bookmark create`, no `--allow-new` in jj 0.40.
+Both create the bookmark, push it, and set up tracking in one command — no prior `jj bookmark create` needed.
 
 **Only fall back to `jj git push -b <name>` when the bookmark already exists** — typically updating a branch you pushed earlier. Bookmarks don't auto-advance, so move it first:
 
