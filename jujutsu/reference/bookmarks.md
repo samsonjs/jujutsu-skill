@@ -38,10 +38,18 @@ jj bookmark set my-feature -r @-      # or whatever revision it should point at
 jj bookmark set main -r @-            # -B only needed when moving backwards/sideways
 ```
 
-**When you don't know which bookmark is lagging** — use the revset to find the nearest:
+**When you just want to drag the closest bookmark up to your work** — `jj bookmark advance` (aka `jj b a`) is the purpose-built command. It moves the nearest ancestor bookmark forward without you naming it:
+
+```bash
+jj bookmark advance                   # advance the closest bookmark toward @
+```
+
+Where it lands is controlled by the `revsets.bookmark-advance-to` config, which can be set to skip an empty scratchpad on top and land on the real work instead. It defaults to `@`.
+
+**When you need full control over source and destination** — drive the move with an explicit revset:
 
 ```bash
 jj bookmark move --from "heads(::@ & bookmarks())" --to @
 ```
 
-The revset `heads(::@ & bookmarks())` finds the closest bookmark ancestor of `@`. Worth a config alias if frequent, but reach for named `bookmark set` first when you know what you're moving.
+The revset `heads(::@ & bookmarks())` finds the closest bookmark ancestor of `@`. Reach for named `bookmark set` first when you already know what you're moving, `jj bookmark advance` when you just want the nearest one tugged up.
