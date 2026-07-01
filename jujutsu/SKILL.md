@@ -57,7 +57,7 @@ printf '%s\n' "Subject line" "" "Body with \"quotes\" and \$vars." | jj desc --s
 The idiomatic jj loop is layered. Two changes are in play:
 
 - **Parent**: the change you'll eventually push. Has a description.
-- **`@` (scratchpad)**: an anonymous child on top, no description. Like git's index — a place to iterate, run tests, undo. Folded into the parent or abandoned.
+- **`@` (scratchpad)**: an anonymous child on top, no description. Like git's index — a place to iterate, run tests, undo. Ends up one of three ways: folded into the parent, promoted into its own change, or abandoned.
 
 ```bash
 jj new -m "Add user authentication"   # parent — what you're shipping
@@ -66,10 +66,20 @@ jj new                                # scratchpad — no message
 jj diff --git                         # review the scratchpad
 jj squash                             # fold into parent; fresh empty @ on top
 # OR
+jj desc -m "message" && jj new        # promote to its own change; fresh scratchpad on top of that
+# OR
 jj abandon                            # throw the scratchpad away; back on parent
 ```
 
-After `jj squash` you're back on a fresh empty `@`, ready for the next iteration. Run as many scratchpad → squash cycles as you want; each means "I made progress, keep it." A dead-end scratchpad → `jj abandon` returns you to the parent untouched. The parent's commit ID changes on every squash, but its **change ID is stable** — that's why you reference it by change ID.
+Which one depends on whether the scratchpad's content is *part of* the parent's idea or a *distinct* one — and this genuinely varies by context, including for the user themselves. Some starting defaults:
+
+- **Squash** when it's a continuation — a fix, a missing piece, cleanup of the same change. The scratchpad has no value as its own unit; folding it in keeps history clean. Squash doesn't have to target the immediate parent — `jj squash --into <id>` sends it to whichever ancestor it actually belongs to, if the change stack represents discrete pieces of work rather than one growing blob.
+- **Promote** by default when the work is unrelated to what you're currently on, even if trivial (an unrelated typo fix found mid-feature gets its own change, not folded into the feature). Also promote for a meaningful checkpoint worth keeping addressable on its own — a different approach you're trying, a step in exploratory work you might want to look back at, cherry-pick, drop, or reorder independently later.
+- **Abandon** when it added nothing worth keeping at all — a dead end with no future value, even as a record.
+
+Whether a finished stack of checkpoints later gets squashed down, squashed into a specific ancestor, or left alone to show its evolution is not a fixed rule — it depends on specifics that live in the user's head (is this shipping as one PR or a stack of them? does the history itself matter later? is it already pushed?). **When it's not obvious which outcome fits, ask instead of guessing** — don't reflexively squash just because a scratchpad is "done."
+
+After `jj squash` you're back on a fresh empty `@`, ready for the next iteration. Run as many scratchpad → squash cycles as you want; each means "I made progress, keep it." The parent's commit ID changes on every squash, but its **change ID is stable** — that's why you reference it by change ID.
 
 **When the scratchpad is overkill**: tiny one-shot work (typo, single-line tweak) — describe `@` directly and edit, skip the layer. Its value is throwing away dead-ends without polluting the parent; no risk of dead-ends, no need for the layer.
 
@@ -129,7 +139,7 @@ Read only the file you need:
 
 ## Best Practices Summary
 
-1. **Layer your work**: parent change with a description, anonymous scratchpad on top. Squash when good, abandon when not.
+1. **Layer your work**: parent change with a description, anonymous scratchpad on top. Squash when it's the same idea, promote to its own change when it's distinct, abandon when it's a dead end — ask when it's not obvious which.
 2. **Reference by change ID**: stable across rewrites.
 3. **Refine before pushing, not before coding**: iterate, then clean up.
 4. **Push with `-c @` or `--named`**: don't bother creating bookmarks manually for normal PR work.
