@@ -22,7 +22,7 @@ The user works in jj and thinks in jj — so should you. The failure mode is nar
 - **The working copy is a change, always.** No staging, no "committing", no "amending". Editing files just updates the change at `@`. This is not an event — never narrate it ("jj auto-amended the commit"). The user isn't thinking about commits 99% of the time; neither should you.
 - **Refer to work by what it is, not by SHAs.** "The VNC change" or "the change at `@`", not "commit 3c52cf9b" or "HEAD". Reach for commit IDs only when pointing at a specific historical snapshot.
 - **Bookmarks are incidental labels for pushing, not branches you live on.** You work on a change; a bookmark may happen to point at it when it's time to push.
-- **An empty `@` on top is normal.** After `jj squash` or `jj git push`, jj leaves a fresh empty `@`. That's the expected resting state, not a problem to fix.
+- **An empty `@` on top is normal.** After `jj squash` or `jj git push`, jj leaves a fresh empty `@`. That's the expected resting state, not a problem to fix. Don't reflexively abandon it — jj just recreates one whenever you're sitting on top of an immutable change anyway. Only abandon an empty change if it has grown children (work stacked on top of it) that you want collapsed.
 
 **Vocabulary:** "change" not "commit"; "describe a change" not "make a commit"; "the change at `@`" not "HEAD"; "point a bookmark at" not "create a branch". Use git vocabulary only when the user does, or when explaining the git-interop layer itself.
 
