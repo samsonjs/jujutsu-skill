@@ -19,7 +19,7 @@ Jujutsu is a Git-compatible VCS with mutable changes and automatic rebasing. Thi
 
 The user works in jj and thinks in jj — so should you. The failure mode is narrating in git terms ("amend the commit", "the branch", "is HEAD pushed?"). Use git-by-analogy to get oriented, then drop the analogy and reason in jj's own model.
 
-- **The working copy is a change, always.** No staging, no "committing", no "amending". Editing files just updates the change at `@`. This is not an event — never narrate it ("jj auto-amended the commit"). The user isn't thinking about commits 99% of the time; neither should you.
+- **The working copy is a change, always.** No staging, no separate commit step. Editing files just updates the change at `@`. This is not an event — never narrate it ("jj auto-amended the commit"). The user isn't thinking about commits 99% of the time; neither should you. The git motions still have equivalents, they just aren't where you'd expect: committing is `jj desc` + `jj new`, amending is `jj squash`.
 - **Refer to work by what it is, not by SHAs.** "The VNC change" or "the change at `@`", not "commit 3c52cf9b" or "HEAD". Reach for commit IDs only when pointing at a specific historical snapshot.
 - **Bookmarks are incidental labels for pushing, not branches you live on.** You work on a change; a bookmark may happen to point at it when it's time to push.
 - **An empty `@` on top is normal.** After `jj squash` or `jj git push`, jj leaves a fresh empty `@`. That's the expected resting state, not a problem to fix. Don't reflexively abandon it — jj just recreates one whenever you're sitting on top of an immutable change anyway. Only abandon an empty change if it has grown children (work stacked on top of it) that you want collapsed.
@@ -48,9 +48,33 @@ printf '%s\n' "Subject line" "" "Body with \"quotes\" and \$vars." | jj desc --s
 
 ## Core Concepts
 
-- **The working copy is a change** (referenced as `@`). Edits are auto-snapshotted into it on any jj command. No staging area, no `jj commit`.
+- **The working copy is a change** (referenced as `@`). Edits are auto-snapshotted into it on any jj command. No staging area, and no commit step to save your work — it's already saved.
 - **Changes are mutable** — described, redescribed, split, squashed, rebased, abandoned freely. You don't have to get a change right up front. This is what makes the scratchpad loop work.
+- **"Committing" is `jj desc` + `jj new`.** There's no `jj commit` step because the content is already saved; what's missing is a description and a boundary. See below.
 - **Change ID vs commit ID.** A change ID (`tqpwlqmp`) is a stable identifier for the *idea* of the change; it survives squash/rebase/redescribe. A commit ID (`3ccf7581`) is a content hash for one snapshot and changes whenever content does. **Reference things by change ID** almost always; commit IDs are for pointing at a specific historical snapshot (see `jj evolog`).
+
+## Finishing a Piece of Work
+
+The git motions map cleanly — they're just spelled differently:
+
+| Git | jj |
+|-----|-----|
+| `git commit -m "..."` | `jj desc -m "..."` then `jj new` |
+| `git commit --amend` | `jj squash` (fold `@` into its parent) |
+| `git add -p`, the index | the scratchpad change (see below) |
+
+**When you finish something, describe `@` and start a new change:**
+
+```bash
+jj desc -m "Add user authentication"   # name what @ holds
+jj new                                 # fresh empty @ on top
+```
+
+That pair is the completion signal, the same way `git commit` is. `jj desc` alone isn't enough — it names the change but leaves you sitting inside it, so the next file you touch joins the work you just declared finished. `jj new` is what draws the line.
+
+(`jj commit -m "..."` is literally these two commands in one. Prefer the explicit pair — it keeps the two halves visible, and `jj desc` is what you reach for anyway when you're only renaming a change.)
+
+Need a fix after that? Don't redescribe or start over: make the fix in the new `@` and `jj squash` it into the parent. That's amend. Change IDs are stable across squash, so the change you named is still the same change.
 
 ## The Inner Loop: Scratchpad + Squash
 
@@ -66,7 +90,7 @@ jj new                                # scratchpad — no message
 jj diff --git                         # review the scratchpad
 jj squash                             # fold into parent; fresh empty @ on top
 # OR
-jj desc -m "message" && jj new        # promote to its own change; fresh scratchpad on top of that
+jj desc -m "message" && jj new        # promote to its own change (the "commit" motion); fresh scratchpad on top
 # OR
 jj abandon                            # throw the scratchpad away; back on parent
 ```
@@ -139,8 +163,9 @@ Read only the file you need:
 
 ## Best Practices Summary
 
-1. **Layer your work**: parent change with a description, anonymous scratchpad on top. Squash when it's the same idea, promote to its own change when it's distinct, abandon when it's a dead end — ask when it's not obvious which.
-2. **Reference by change ID**: stable across rewrites.
-3. **Refine before pushing, not before coding**: iterate, then clean up.
-4. **Push with `-c @` or `--named`**: don't bother creating bookmarks manually for normal PR work.
-5. **Trust the op log**: `jj op log` + `jj op restore` is your safety net. Almost nothing is truly lost.
+1. **"Commit" with `jj desc -m "..."` then `jj new`**; "amend" with `jj squash`.
+2. **Layer your work**: parent change with a description, anonymous scratchpad on top. Squash when it's the same idea, promote to its own change when it's distinct, abandon when it's a dead end — ask when it's not obvious which.
+3. **Reference by change ID**: stable across rewrites.
+4. **Refine before pushing, not before coding**: iterate, then clean up.
+5. **Push with `-c @` or `--named`**: don't bother creating bookmarks manually for normal PR work.
+6. **Trust the op log**: `jj op log` + `jj op restore` is your safety net. Almost nothing is truly lost.
