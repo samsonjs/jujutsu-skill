@@ -31,17 +31,16 @@ If you use [just](just.systems), you can run:
 just install
 ```
 
-Copy the `skill/` directory into your project's `.claude/skills/` directory:
+That symlinks `jujutsu/` into `~/.claude/skills/`, so edits in this checkout take
+effect without reinstalling.
+
+To install it into a single project instead, symlink it there:
 
 ```bash
-cp -r skill/ /path/to/your/project/.claude/skills/jj-vcs/
+ln -s "$PWD/jujutsu" /path/to/your/project/.claude/skills/jujutsu
 ```
 
-Or install it as a global skill:
-
-```bash
-cp -r skill/ ~/.claude/skills/jj-vcs/
-```
+Copying works too, but the copy drifts as this repo changes.
 
 ## Skill Contents
 
