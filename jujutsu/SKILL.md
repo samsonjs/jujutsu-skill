@@ -159,6 +159,7 @@ Read only the file you need:
 | Create/move/delete/forget/tug bookmarks | `reference/bookmarks.md` |
 | Clone/init, colocated repos, push safety details | `reference/git.md` |
 | Resolve conflicts (jj's markers ≠ git's) | `reference/conflicts.md` |
+| Run a slow build or test against one revision while editing another (workspaces) | `reference/workspaces.md` |
 | Write revsets (`-r '...'`) | `reference/revsets.md` |
 
 ## Best Practices Summary

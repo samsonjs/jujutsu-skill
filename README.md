@@ -54,7 +54,8 @@ jujutsu/
     ├── bookmarks.md  # Set/delete/forget/track, tugging forward
     ├── git.md        # Clone/init, colocated repos, push safety
     ├── conflicts.md  # jj's conflict markers and resolution
-    └── revsets.md    # Revset syntax
+    ├── revsets.md    # Revset syntax
+    └── workspaces.md # Multiple working copies on one repo (jj's git worktree)
 ```
 
 ## Key Workflow Philosophy
