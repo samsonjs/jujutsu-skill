@@ -25,19 +25,22 @@ Jujutsu (jj) is a Git-compatible version control system that offers several adva
 
 ## Installation
 
-If you use [just](just.systems), you can run:
+Symlink the skill into `~/.claude/skills` so edits in this checkout take effect immediately:
 
+```sh
+./install.sh
 ```
-just install
+
+To install it into a single project instead, pass that project's skills directory:
+
+```sh
+./install.sh /path/to/your/project/.claude/skills
 ```
 
-That symlinks `jujutsu/` into `~/.claude/skills/`, so edits in this checkout take
-effect without reinstalling.
+Both are a one-line symlink, so do it by hand if you'd rather:
 
-To install it into a single project instead, symlink it there:
-
-```bash
-ln -s "$PWD/jujutsu" /path/to/your/project/.claude/skills/jujutsu
+```sh
+ln -s "$PWD/jujutsu" ~/.claude/skills/jujutsu
 ```
 
 Copying works too, but the copy drifts as this repo changes.
